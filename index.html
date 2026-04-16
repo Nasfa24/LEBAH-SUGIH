@@ -18,7 +18,6 @@
     <link rel="manifest" href="manifest.json">
 
     <script>
-      // FIX BUG: Pendaftaran Service Worker yang aman untuk GitHub Pages
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('sw.js').then(function(registration) {
@@ -133,7 +132,7 @@
         <h3 style="margin-top:0; color:#fff; margin-bottom: 20px;">Tambah Aset Baru</h3>
         <form id="formAset" onsubmit="simpanAset(event)">
           <div style="display:flex; gap:10px;">
-            <div class="input-group" style="flex:2;"><label>Ticker (Kode)</label><input type="text" id="ticker" required placeholder="ANTAM / BBCA"></div>
+            <div class="input-group" style="flex:2;"><label>Ticker (Kode)</label><input type="text" id="ticker" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase()" required placeholder="ANTAM / BBCA"></div>
             <div class="input-group" style="flex:1;">
               <label>Kategori</label>
               <select id="kategori">
@@ -149,7 +148,7 @@
           </div>
           <div style="display:flex; gap:10px;">
             <div class="input-group" style="flex:1;"><label>Avg Price / Gram</label><input type="text" inputmode="decimal" id="hargaBeli" oninput="formatRupiah(this)" required></div>
-            <div class="input-group" style="flex:1;"><label>Kuantitas (Gram/Lot)</label><input type="text" inputmode="decimal" id="kuantitas" oninput="formatRupiah(this)" required></div>
+            <div class="input-group" style="flex:1;"><label>Qty (Gram/Lot)</label><input type="text" inputmode="decimal" id="kuantitas" required placeholder="Misal: 0.5 atau 10"></div>
           </div>
           <div style="display:flex; gap:10px;">
             <div class="input-group" style="flex:1;"><label>Target TP (%)</label><input type="number" id="tp" step="any" required></div>
@@ -169,7 +168,7 @@
           <div class="input-group"><label>Aset</label><input type="text" id="jualTickerLabel" readonly disabled style="background:#0f2027; color:#00ff88; text-align:center;"></div>
           <div style="display:flex; gap:10px;">
             <div class="input-group" style="flex:1;"><label>Harga Jual</label><input type="text" inputmode="decimal" id="jualHarga" oninput="formatRupiah(this)" required></div>
-            <div class="input-group" style="flex:1;"><label>Qty Dijual</label><input type="text" inputmode="decimal" id="jualKuantitas" oninput="formatRupiah(this)" required></div>
+            <div class="input-group" style="flex:1;"><label>Qty Dijual</label><input type="text" inputmode="decimal" id="jualKuantitas" required placeholder="Misal: 0.5"></div>
           </div>
           <button type="submit" class="btn" id="btnEksekusiJual" style="background: linear-gradient(90deg, #ef4444, #b91c1c); color:#fff; margin-top:10px;">Eksekusi & Tarik ke Kas</button>
         </form>
@@ -184,7 +183,15 @@
         let intPart = parts[0].replace(/\./g, ''); intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
         obj.value = (parts.length > 1) ? intPart + ',' + parts[1] : intPart;
       }
+      
       function bersihkanAngka(str) { return parseFloat(str.replace(/\./g, '').replace(',', '.')); }
+      
+      // FUNGSI KHUSUS AGAR KUANTITAS MENERIMA KOMA DAN TITIK SEBAGAI DESIMAL
+      function bersihkanKuantitas(str) {
+        if (!str) return 0;
+        return parseFloat(str.toString().replace(',', '.'));
+      }
+
       function formatDisplay(num) { return new Intl.NumberFormat('id-ID').format(num); }
 
       function pindahTab(tab) {
@@ -226,10 +233,36 @@
       function bukaModalAset() { document.getElementById('modalAset').style.display = 'flex'; }
       function bukaModalSync() { document.getElementById('modalSync').style.display = 'flex'; }
       function eksekusiSync(e) { e.preventDefault(); var btn = document.getElementById('btnSync'); btn.innerHTML = "Memperbarui..."; btn.disabled = true; var nom = bersihkanAngka(document.getElementById('saldoBaru').value); panggilAPI('sinkronisasiSaldo', nom, function(res) { document.getElementById('modalSync').style.display = 'none'; document.getElementById('formSync').reset(); btn.innerHTML = "Perbarui Saldo"; btn.disabled = false; muatDataPorto(); }); }
-      function simpanAset(e) { e.preventDefault(); var btn = document.getElementById('btnSimpanAset'); btn.innerHTML = "Menyimpan..."; btn.disabled = true; var data = { ticker: document.getElementById('ticker').value, kategori: document.getElementById('kategori').value, sourceStrategy: document.getElementById('strategi').value, hargaBeli: bersihkanAngka(document.getElementById('hargaBeli').value), kuantitas: bersihkanAngka(document.getElementById('kuantitas').value), tp: document.getElementById('tp').value, sl: document.getElementById('sl').value }; panggilAPI('tambahAsetBaru', data, function(res) { document.getElementById('modalAset').style.display = 'none'; document.getElementById('formAset').reset(); btn.innerHTML = "Simpan ke Radar"; btn.disabled = false; muatDataPorto(); }); }
+      
+      function simpanAset(e) { 
+        e.preventDefault(); 
+        var btn = document.getElementById('btnSimpanAset'); btn.innerHTML = "Menyimpan..."; btn.disabled = true; 
+        var data = { 
+          ticker: document.getElementById('ticker').value, 
+          kategori: document.getElementById('kategori').value, 
+          sourceStrategy: document.getElementById('strategi').value, 
+          hargaBeli: bersihkanAngka(document.getElementById('hargaBeli').value), 
+          kuantitas: bersihkanKuantitas(document.getElementById('kuantitas').value), // MENGGUNAKAN PARSER DESIMAL
+          tp: document.getElementById('tp').value, 
+          sl: document.getElementById('sl').value 
+        }; 
+        panggilAPI('tambahAsetBaru', data, function(res) { document.getElementById('modalAset').style.display = 'none'; document.getElementById('formAset').reset(); btn.innerHTML = "Simpan ke Radar"; btn.disabled = false; muatDataPorto(); }); 
+      }
+      
       function hitungDeal(e) { e.preventDefault(); var btn = document.getElementById('btnDeal'); btn.innerHTML = "Menganalisis..."; btn.disabled = true; var data = { namaBarang: document.getElementById('dealNama').value, hargaPasar: bersihkanAngka(document.getElementById('dealPasar').value), hargaTawaran: bersihkanAngka(document.getElementById('dealTawaran').value), biayaServis: bersihkanAngka(document.getElementById('dealServis').value) }; panggilAPI('tambahDealEvaluator', data, function(res) { btn.innerHTML = "Cek Kelayakan"; btn.disabled = false; var el = document.getElementById('hasilDeal'); el.style.display = 'block'; document.getElementById('angkaMoS').innerHTML = res.mos; document.getElementById('statusDeal').innerHTML = res.keputusan; if(res.keputusan.includes("AMAN")) { document.getElementById('statusDeal').className = "status hijau"; document.getElementById('angkaMoS').style.color = "#00ff88"; } else { document.getElementById('statusDeal').className = "status merah"; document.getElementById('angkaMoS').style.color = "#ef4444"; } document.getElementById('formDeal').reset(); }); }
+      
       function bukaModalJual(ticker) { var aset = asetTersedia[ticker]; document.getElementById('jualTicker').value = ticker; document.getElementById('jualTickerLabel').value = ticker + " (Qty: " + aset.kuantitas + ")"; var inp = document.getElementById('jualHarga'); inp.value = aset.hargaLive; formatRupiah(inp); document.getElementById('jualKuantitas').placeholder = "Maksimal: " + aset.kuantitas; document.getElementById('modalJual').style.display = 'flex'; }
-      function eksekusiJual(e) { e.preventDefault(); var btn = document.getElementById('btnEksekusiJual'); btn.innerHTML = "Mengeksekusi..."; btn.disabled = true; var data = { ticker: document.getElementById('jualTicker').value, hargaJual: bersihkanAngka(document.getElementById('jualHarga').value), kuantitasJual: bersihkanAngka(document.getElementById('jualKuantitas').value) }; panggilAPI('eksekusiJualDinamis', data, function(res) { document.getElementById('modalJual').style.display = 'none'; document.getElementById('formJual').reset(); btn.innerHTML = "Eksekusi & Tarik ke Kas"; btn.disabled = false; if(res === "BERHASIL") muatDataPorto(); else { alert(res); muatDataPorto(); } }); }
+      
+      function eksekusiJual(e) { 
+        e.preventDefault(); 
+        var btn = document.getElementById('btnEksekusiJual'); btn.innerHTML = "Mengeksekusi..."; btn.disabled = true; 
+        var data = { 
+          ticker: document.getElementById('jualTicker').value, 
+          hargaJual: bersihkanAngka(document.getElementById('jualHarga').value), 
+          kuantitasJual: bersihkanKuantitas(document.getElementById('jualKuantitas').value) // MENGGUNAKAN PARSER DESIMAL
+        }; 
+        panggilAPI('eksekusiJualDinamis', data, function(res) { document.getElementById('modalJual').style.display = 'none'; document.getElementById('formJual').reset(); btn.innerHTML = "Eksekusi & Tarik ke Kas"; btn.disabled = false; if(res === "BERHASIL") muatDataPorto(); else { alert(res); muatDataPorto(); } }); 
+      }
       
       muatDataPorto();
     </script>
