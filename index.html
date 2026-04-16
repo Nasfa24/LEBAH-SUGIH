@@ -218,7 +218,13 @@
           if (item.status.includes("🟢")) bgColor = "hijau"; else if (item.status.includes("🔴")) bgColor = "merah"; else if (item.status.includes("🟡")) bgColor = "kuning";
           var profitColor = item.status.includes("MINUS") || item.status.includes("CUT LOSS") ? "#ef4444" : "#00ff88";
 
-          var card = `<div class="card"><div class="header-card"><div class="ticker">${item.ticker}</div><div class="label">${item.label}</div></div><div class="data-row"><span>Kategori</span><span style="font-weight:600; color:#94a3b8;">${item.kategori}</span></div><div class="data-row"><span>Avg Price</span><span style="font-weight:600; color:#fff;">${formatDisplay(item.hargaBeli)}</span></div><div class="data-row"><span>Live Price</span><span style="font-weight:600; color:#fff;">${formatDisplay(item.hargaLive)}</span></div><div class="data-row"><span>Qty</span><span style="font-weight:600; color:#94a3b8;">${formatDisplay(item.kuantitas)}</span></div><div class="data-row" style="margin-top:10px; align-items:center;"><span>Net Profit</span><span class="net-profit" style="color:${profitColor};">${item.netProfit}</span></div><div class="status ${bgColor}">${item.status}</div><button onclick="bukaModalJual('${item.ticker}')" style="width:100%; margin-top:15px; padding:12px; background:rgba(239, 68, 68, 0.1); color:#ef4444; border:1px solid rgba(239, 68, 68, 0.3); border-radius:8px; font-weight:bold; cursor:pointer;">⚖️ Rebalance / Jual</button></div>`;
+          // --- LOGIKA PINTAR: TAMPILAN KUANTITAS SAHAM (LBR) vs LAINNYA ---
+          var dispKuantitas = formatDisplay(item.kuantitas);
+          if (item.kategori === "Saham") {
+            dispKuantitas = formatDisplay(item.kuantitas * 100) + " Lbr";
+          }
+
+          var card = `<div class="card"><div class="header-card"><div class="ticker">${item.ticker}</div><div class="label">${item.label}</div></div><div class="data-row"><span>Kategori</span><span style="font-weight:600; color:#94a3b8;">${item.kategori}</span></div><div class="data-row"><span>Avg Price</span><span style="font-weight:600; color:#fff;">${formatDisplay(item.hargaBeli)}</span></div><div class="data-row"><span>Live Price</span><span style="font-weight:600; color:#fff;">${formatDisplay(item.hargaLive)}</span></div><div class="data-row"><span>Qty</span><span style="font-weight:600; color:#94a3b8;">${dispKuantitas}</span></div><div class="data-row" style="margin-top:10px; align-items:center;"><span>Net Profit</span><span class="net-profit" style="color:${profitColor};">${item.netProfit}</span></div><div class="status ${bgColor}">${item.status}</div><button onclick="bukaModalJual('${item.ticker}')" style="width:100%; margin-top:15px; padding:12px; background:rgba(239, 68, 68, 0.1); color:#ef4444; border:1px solid rgba(239, 68, 68, 0.3); border-radius:8px; font-weight:bold; cursor:pointer;">⚖️ Rebalance / Jual</button></div>`;
           app.innerHTML += card;
         });
       }
@@ -254,19 +260,18 @@
       
       function hitungDeal(e) { e.preventDefault(); var btn = document.getElementById('btnDeal'); btn.innerHTML = "Menganalisis..."; btn.disabled = true; var data = { namaBarang: document.getElementById('dealNama').value, hargaPasar: bersihkanAngka(document.getElementById('dealPasar').value), hargaTawaran: bersihkanAngka(document.getElementById('dealTawaran').value), biayaServis: bersihkanAngka(document.getElementById('dealServis').value) }; panggilAPI('tambahDealEvaluator', data, function(res) { btn.innerHTML = "Cek Kelayakan"; btn.disabled = false; var el = document.getElementById('hasilDeal'); el.style.display = 'block'; document.getElementById('angkaMoS').innerHTML = res.mos; document.getElementById('statusDeal').innerHTML = res.keputusan; if(res.keputusan.includes("AMAN")) { document.getElementById('statusDeal').className = "status hijau"; document.getElementById('angkaMoS').style.color = "#00ff88"; } else { document.getElementById('statusDeal').className = "status merah"; document.getElementById('angkaMoS').style.color = "#ef4444"; } document.getElementById('formDeal').reset(); }); }
       
-      // ==============================================================
-      // OTAK AI REKOMENDASI JUAL (DECISION MATRIX)
-      // ==============================================================
       function bukaModalJual(ticker) { 
         var aset = asetTersedia[ticker]; 
         document.getElementById('jualTicker').value = ticker; 
-        document.getElementById('jualTickerLabel').value = ticker + " (Qty: " + aset.kuantitas + ")"; 
+        
+        var dispLabel = (aset.kategori === "Saham") ? (aset.kuantitas * 100) + " Lbr" : aset.kuantitas;
+        document.getElementById('jualTickerLabel').value = ticker + " (Qty: " + dispLabel + ")"; 
+        
         var inp = document.getElementById('jualHarga'); 
         inp.value = aset.hargaLive; 
         formatRupiah(inp); 
-        document.getElementById('jualKuantitas').placeholder = "Maksimal: " + aset.kuantitas; 
+        document.getElementById('jualKuantitas').placeholder = "Input dlm Lot/Gram (Maks: " + aset.kuantitas + ")"; 
         
-        // Baca data dari backend
         var netProfit = parseFloat(aset.netProfitRaw) || 0;
         var tp = parseFloat(aset.tp) || 0;
         var sl = parseFloat(aset.sl) || 0;
@@ -279,44 +284,29 @@
         var aiActive = false;
         var isDanger = false;
 
-        // 1. PROTOKOL GUILLOTINE (Cut Loss Darurat)
         if (netProfit < 0 && sl > 0 && netProfit <= -(sl * 0.8)) {
-          porsi = 1; // 100% Jual
-          aiMsg = "<strong>⚠️ PROTOKOL CUT LOSS!</strong>Harga mendekati batas Stop Loss maksimum Anda. Segera eksekusi seluruh lot/koin sebelum kerugian membesar!";
+          porsi = 1; aiMsg = "<strong>⚠️ PROTOKOL CUT LOSS!</strong>Harga mendekati batas Stop Loss maksimum Anda. Segera eksekusi seluruh lot/koin sebelum kerugian membesar!";
+          aiActive = true; isDanger = true;
+        } else if (netProfit > 0 && label.includes("MOMENTUM") && (netProfit >= 0.20 || netProfit >= (tp * 0.5))) {
+          porsi = 0.5; aiMsg = "<strong>💡 AI: THE HOUSE MONEY</strong>Amankan separuh modal awal Anda. Biarkan sisa aset berada di market tanpa beban psikologis (Risk-Free).";
           aiActive = true;
-          isDanger = true;
-        } 
-        // 2. THE HOUSE MONEY (Momentum / Paus Bergerak)
-        else if (netProfit > 0 && label.includes("MOMENTUM") && (netProfit >= 0.20 || netProfit >= (tp * 0.5))) {
-          porsi = 0.5; // 50% Jual
-          aiMsg = "<strong>💡 AI: THE HOUSE MONEY</strong>Amankan separuh modal awal Anda. Biarkan sisa aset berada di market tanpa beban psikologis (Risk-Free).";
-          aiActive = true;
-        }
-        // 3. SCALING OUT (Blue Chip / Buffettology)
-        else if (netProfit > 0 && label.includes("BLUE CHIP") && netProfit >= (tp * 0.8)) {
-          porsi = 0.3; // 30% Jual
-          aiMsg = "<strong>💡 AI: SCALING OUT</strong>Target TP hampir tercapai. Realisasikan 30% profit sekarang untuk cadangan kas peluru, biarkan sisanya tumbuh.";
+        } else if (netProfit > 0 && label.includes("BLUE CHIP") && netProfit >= (tp * 0.8)) {
+          porsi = 0.3; aiMsg = "<strong>💡 AI: SCALING OUT</strong>Target TP hampir tercapai. Realisasikan 30% profit sekarang untuk cadangan kas peluru, biarkan sisanya tumbuh.";
           aiActive = true;
         }
 
-        // Tampilkan kotak AI jika ada rekomendasi
         var aiBox = document.getElementById('ai-rekomendasi');
         if (aiActive && qty > 0) {
-          // Format desimal/bulat sesuai kategori
           recQty = (aset.kategori === "Saham") ? Math.floor(qty * porsi) : parseFloat((qty * porsi).toFixed(4));
-          if (recQty <= 0) recQty = qty; // Jika pecahan terlalu kecil, jual semua
-          
-          aiBox.innerHTML = aiMsg + "<br><span style='color:#fff; font-weight:bold; margin-top:5px; display:block;'>Rekomendasi Jual: " + recQty + "</span>";
+          if (recQty <= 0) recQty = qty;
+          aiBox.innerHTML = aiMsg + "<br><span style='color:#fff; font-weight:bold; margin-top:5px; display:block;'>Rekomendasi Jual: " + recQty + (aset.kategori === "Saham" ? " Lot" : "") + "</span>";
           aiBox.className = isDanger ? "ai-box danger" : "ai-box";
           aiBox.style.display = 'block';
-          
-          // Auto-fill Kuantitas
           document.getElementById('jualKuantitas').value = recQty;
         } else {
           aiBox.style.display = 'none';
-          document.getElementById('jualKuantitas').value = ""; // Kosongkan jika tidak ada instruksi
+          document.getElementById('jualKuantitas').value = ""; 
         }
-
         document.getElementById('modalJual').style.display = 'flex'; 
       }
       
