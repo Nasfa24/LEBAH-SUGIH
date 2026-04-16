@@ -11,16 +11,17 @@
     <meta name="apple-mobile-web-app-title" content="Lebah Sugih">
     <meta name="theme-color" content="#0f2027">
     
-    <link rel="apple-touch-icon" href="./icon-192.png">
-    <link rel="icon" sizes="192x192" href="./icon-192.png">
-    <link rel="icon" sizes="512x512" href="./icon-512.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" sizes="192x192" href="icon-192.png">
+    <link rel="icon" sizes="512x512" href="icon-512.png">
 
-    <link rel="manifest" href="./manifest.json">
+    <link rel="manifest" href="manifest.json">
 
     <script>
+      // FIX BUG: Pendaftaran Service Worker yang aman untuk GitHub Pages
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-          navigator.serviceWorker.register('./sw.js').then(function(registration) {
+          navigator.serviceWorker.register('sw.js').then(function(registration) {
             console.log('PWA Mesin Aktif: ', registration.scope);
           }).catch(function(err) {
             console.log('PWA Gagal: ', err);
@@ -74,7 +75,7 @@
   <body>
     <div class="header">
       <div style="display:flex; justify-content:center; align-items:center; gap:10px;">
-        <img src="./logo.png" alt="Logo" style="height:32px; width:auto; border-radius:4px;">
+        <img src="logo.png" alt="Logo" style="height:32px; width:auto; border-radius:4px;">
         <h2>LEBAH SUGIH</h2>
       </div>
     </div>
