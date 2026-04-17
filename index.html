@@ -218,10 +218,14 @@
           if (item.status.includes("🟢")) bgColor = "hijau"; else if (item.status.includes("🔴")) bgColor = "merah"; else if (item.status.includes("🟡")) bgColor = "kuning";
           var profitColor = item.status.includes("MINUS") || item.status.includes("CUT LOSS") ? "#ef4444" : "#00ff88";
 
-          // --- LOGIKA PINTAR: TAMPILAN KUANTITAS SAHAM (LBR) vs LAINNYA ---
+          // --- LOGIKA PINTAR: TAMPILAN SATUAN (LOT / GRAM / COIN) ---
           var dispKuantitas = formatDisplay(item.kuantitas);
           if (item.kategori === "Saham") {
-            dispKuantitas = formatDisplay(item.kuantitas * 100) + " Lbr";
+            dispKuantitas = formatDisplay(item.kuantitas) + " Lot";
+          } else if (item.kategori === "Emas") {
+            dispKuantitas = formatDisplay(item.kuantitas) + " Gram";
+          } else if (item.kategori === "Crypto") {
+            dispKuantitas = formatDisplay(item.kuantitas) + " Coin";
           }
 
           var card = `<div class="card"><div class="header-card"><div class="ticker">${item.ticker}</div><div class="label">${item.label}</div></div><div class="data-row"><span>Kategori</span><span style="font-weight:600; color:#94a3b8;">${item.kategori}</span></div><div class="data-row"><span>Avg Price</span><span style="font-weight:600; color:#fff;">${formatDisplay(item.hargaBeli)}</span></div><div class="data-row"><span>Live Price</span><span style="font-weight:600; color:#fff;">${formatDisplay(item.hargaLive)}</span></div><div class="data-row"><span>Qty</span><span style="font-weight:600; color:#94a3b8;">${dispKuantitas}</span></div><div class="data-row" style="margin-top:10px; align-items:center;"><span>Net Profit</span><span class="net-profit" style="color:${profitColor};">${item.netProfit}</span></div><div class="status ${bgColor}">${item.status}</div><button onclick="bukaModalJual('${item.ticker}')" style="width:100%; margin-top:15px; padding:12px; background:rgba(239, 68, 68, 0.1); color:#ef4444; border:1px solid rgba(239, 68, 68, 0.3); border-radius:8px; font-weight:bold; cursor:pointer;">⚖️ Rebalance / Jual</button></div>`;
@@ -264,8 +268,12 @@
         var aset = asetTersedia[ticker]; 
         document.getElementById('jualTicker').value = ticker; 
         
-        var dispLabel = (aset.kategori === "Saham") ? (aset.kuantitas * 100) + " Lbr" : aset.kuantitas;
-        document.getElementById('jualTickerLabel').value = ticker + " (Qty: " + dispLabel + ")"; 
+        var satuan = "";
+        if (aset.kategori === "Saham") satuan = " Lot";
+        else if (aset.kategori === "Emas") satuan = " Gram";
+        else if (aset.kategori === "Crypto") satuan = " Coin";
+
+        document.getElementById('jualTickerLabel').value = ticker + " (Qty: " + aset.kuantitas + satuan + ")"; 
         
         var inp = document.getElementById('jualHarga'); 
         inp.value = aset.hargaLive; 
